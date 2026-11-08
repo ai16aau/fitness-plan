@@ -1,6 +1,6 @@
 {
- "name": "Strength Plan",
- "short_name": "Strength",
+ "name": "Fitness Plan",
+ "short_name": "Fitness",
  "start_url": "./",
  "scope": "./",
  "display": "standalone",

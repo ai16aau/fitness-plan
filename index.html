@@ -139,13 +139,24 @@ const topOf=r=>{const m=String(r).match(/\d+/g);return m?+m[m.length>1?1:0]:0};
 function lastTime(w,di,e,name){for(let ww=w;ww>=1;ww--)for(let dd=(ww===w?di-1:6);dd>=0;dd--){const d=DAYS[dd];
   const ids=[...base(d,D.weeks[ww-1].ab),...customs(ww,d)].filter(x=>(x.custom&&x.id===e.id)||(!x.custom&&x.v&&res(x,locOf(ww,d)).name===name)).map(x=>x.id);
   for(const id of ids){const L=get(K(ww,d,id));const s=(L.s||[]).filter(x=>x&&(x.r||x.kg));if(!s.length)continue;
-   const R=res(e,locOf(ww,d)),kgs=s.map(x=>num(x.kg)).filter(Boolean);
-   return{txt:`Last time (week ${ww}, ${d}): `+s.map(x=>(x.r||"?")+(x.kg?` @ ${x.kg} kg${R.assist?" assist":""}`:"")).join(", "),top:s.length>=Math.min(e.sets,setsN(e,ww))&&s.every(x=>+x.r>=topOf(R.reps)),hi:kgs.length?Math.max(...kgs):0,lo:kgs.length?Math.min(...kgs):0}}}return null}
-function nextHint(lt,r){if(!lt)return"";const kg=r.kg!==false;
- if(lt.top){if(r.assist&&lt.lo)return`⬆️ You hit the top of the range. Today try less assist: about ${Math.max(0,lt.lo-5)} kg, and drop back to the bottom of the rep range.`;
-  if(kg&&lt.hi){const step=r.equip.startsWith("dumbbell")?(lt.hi<10?1:2):2.5;return`⬆️ You hit the top of the range. Today try the next weight up (about ${+(lt.hi+step).toFixed(1)} kg) and drop back to the bottom of the rep range.`}
-  return r.assist||!kg?"⬆️ You hit the top of the range. Today make it harder: a lighter band, or slower lowering.":"⬆️ You hit the top of the range. Try the next weight up today."}
- return`➡️ Same ${r.assist?"assist":"weight"} as last time. Aim for 1 more rep on at least one set.`}
+   const R=res(e,locOf(ww,d));
+   return{txt:`Last time (week ${ww}, ${d}): `+s.map(x=>(x.r||"?")+(x.kg?` @ ${x.kg} kg${R.assist?" assist":""}`:"")).join(", "),s,R,plan:Math.min(e.sets,setsN(e,ww))}}}return null}
+const botOf=r=>{const m=String(r).match(/\d+/);return m?+m[0]:0};
+function plan2(lt,r){if(!lt)return null;const kg=r.kg!==false,as=!!r.assist,top=topOf(r.reps),bot=botOf(r.reps);
+ const kgs=lt.s.map(x=>num(x.kg)).filter(Boolean);
+ // judge on working sets: the heaviest weight used (or lightest assist); ignore warm-up sets
+ const ref=kgs.length?(as?Math.min(...kgs):Math.max(...kgs)):0;
+ const work=kgs.length?lt.s.filter(x=>num(x.kg)===ref):lt.s;const reps=work.map(x=>+x.r||0);
+ const enough=work.length>=Math.min(2,lt.plan),best=Math.max(...reps),avg=reps.reduce((a,b)=>a+b,0)/reps.length;
+ const db=r.equip.startsWith("dumbbell"),step=as?5:db?(ref<10?1:2):2.5,u=as?" kg assist":" kg";
+ const way=enough&&avg>=top+4,hit=enough&&reps.every(n=>n>=top),under=reps.every(n=>n<bot-1);
+ // a single set far past the range still counts: weight is clearly too light
+ const jump=way||best>=top+6?2:hit?1:0;
+ if(jump&&ref&&kg){const t=+(as?Math.max(0,ref-step*jump):ref+step*jump).toFixed(1);
+  return{t:t+u,h:`${jump===2?"⏫ Way past the range last time, so jump two steps":"⬆️ You hit the top of the range, so go up one step"}: ${as?"less assist, about ":"about "}${t}${u}. Start at the bottom of the rep range (${bot}) and build up again.`}}
+ if(jump)return{t:"Make it harder",h:"⬆️ Too easy last time. Make it harder today: a lighter band, a weight, or 3 seconds lowering."};
+ if(under&&ref&&kg){const t=+(as?ref+step:Math.max(0,ref-step)).toFixed(1);return{t:t+u,h:`⬇️ Below the range last time. Today use ${as?"a bit more assist":"one step lighter"} (about ${t}${u}) and own the reps.`}}
+ return{t:ref?ref+u:"Beat last time",h:`➡️ Same ${as?"assist":"weight"} as last time${ref?` (${ref}${u})`:""}. Aim for 1 more rep on at least one set.`}}
 const slug=n=>"ph-"+String(n).toLowerCase().replace(/[^a-z0-9]+/g,"-");
 function pics(img,name){const own=get(slug(name)).data;const yt="https://www.youtube.com/results?search_query="+encodeURIComponent(name+" how to");
  if(own)return`<div class="pics one"><div class="lb"><img src="${own}" alt=""><span>Your photo</span></div></div><div class="phbar"><label class="mini-btn">📷 Change photo<input type="file" accept="image/*" data-photo="${esc(name)}" hidden></label> <button class="mini-btn" data-unphoto="${esc(name)}">Use default</button></div>`;
@@ -165,13 +176,13 @@ function render(){const wk=D.weeks[W-1],day=DAYS[DI];
   if(TAB==="Today"){const L=locOf(W,day);h+=`<div class="gyms">${D.locs.map(l=>`<button class="${l===L?"on":""}" data-loc="${l}">${{"Third Space":"🏋️<small>Third Space</small>","Office gym":"🏢<small>Office</small>","PureGym":"💪<small>PureGym</small>","Gym Group":"🏃‍♀️<small>Gym Group</small>","Home":"🏠<small>Home</small>"}[l]}</button>`).join("")}</div>`}}
  h+=`<div class="sync" id="sync"></div></div>`+(TAB==="Today"?today(wk,day):TAB==="Week"?week(wk):plan())+`</div><div class="tabbar">${[["Today","📅"],["Week","🗓️"],["Plan","📋"]].map(([t,i])=>`<button class="${TAB===t?"on":""}" data-tab="${t}"><div>${i}</div>${t}</button>`).join("")}</div>`;
  document.getElementById("app").innerHTML=h;bind();updSync()}
-function card(e,r,key,lt){const plan=setsN(e,W),ns=plan+(get(key).extra||0);const S=get(key).s||[];const kg=r.kg!==false;const all=S.filter(x=>x&&x.done).length>=plan;const def=String(r.reps).split(" ")[0];
+function card(e,r,key,lt){const P=plan2(lt,r);const plan=setsN(e,W),ns=plan+(get(key).extra||0);const S=get(key).s||[];const kg=r.kg!==false;const all=S.filter(x=>x&&x.done).length>=plan;const def=String(r.reps).split(" ")[0];
  return`<div class="ex ${all?"all":""}">${pics(r.img,r.name)}<div class="body"><span class="eq">${eqIcon(r.equip)} ${esc(r.equip)}</span>${e.custom?'<span class="eq" style="background:var(--amber2)">Your exercise</span>':""}
  ${r.swap?`<div class="swap">${esc(locOf(W,DAYS[DI]))} version of: ${esc(r.swap)}</div>`:""}<div class="name">${esc(r.name)}</div>
- <div class="big"><div class="box"><b>${ns}</b><span>sets</span></div><div class="box"><b>${esc(r.reps)}</b><span>${e.unit==="secs"?"time":"reps"}</span></div><div class="box w"><b>${esc(r.start)}</b><span>start</span></div></div>
- <div class="tip">${esc(r.cue)}</div>${IMG[r.img]&&!get(slug(r.name)).data?`<label class="mini-btn" style="margin-top:6px">📷 Use my own photo<input type="file" accept="image/*" data-photo="${esc(r.name)}" hidden></label>`:""}${lt?`<div class="last">${esc(lt.txt)}</div><div class="hint">${esc(nextHint(lt,r))}</div>`:""}
+ <div class="big"><div class="box"><b>${ns}</b><span>sets</span></div><div class="box"><b>${esc(r.reps)}</b><span>${e.unit==="secs"?"time":"reps"}</span></div><div class="box w"><b>${esc(P?P.t:r.start)}</b><span>${P?"today":"start"}</span></div></div>
+ <div class="tip">${esc(r.cue)}</div>${IMG[r.img]&&!get(slug(r.name)).data?`<label class="mini-btn" style="margin-top:6px">📷 Use my own photo<input type="file" accept="image/*" data-photo="${esc(r.name)}" hidden></label>`:""}${lt?`<div class="last">${esc(lt.txt)}</div><div class="hint">${esc(P.h)}</div>`:""}
  <div class="hdr ${kg?"":"nokg"}"><span>Set</span><span>${e.unit==="secs"?"Seconds":"Reps done"}</span>${kg?`<span>${r.assist?"kg assist":"kg used"}</span>`:""}<span></span></div>
- ${Array.from({length:ns},(_,j)=>{const x=S[j]||{};return`<div class="setrow ${kg?"":"nokg"}"><span class="sn">${j+1}</span><input inputmode="numeric" placeholder="${esc(def)}" data-k="${key}" data-j="${j}" data-f="r" value="${esc(x.r||"")}">${kg?`<input inputmode="decimal" placeholder="kg" data-k="${key}" data-j="${j}" data-f="kg" value="${esc(x.kg||"")}">`:""}<button class="tick ${x.done?"on":""}" data-k="${key}" data-j="${j}" data-n="${plan}" data-def="${esc(def)}">${x.done?"✓":"○"}</button></div>`}).join("")}
+ ${Array.from({length:ns},(_,j)=>{const x=S[j]||{};return`<div class="setrow ${kg?"":"nokg"}"><span class="sn">${j+1}</span><input inputmode="numeric" placeholder="${esc(def)}" data-k="${key}" data-j="${j}" data-f="r" value="${esc(x.r||"")}">${kg?`<input inputmode="decimal" placeholder="${P&&/^[\d.]+ kg/.test(P.t)?esc(P.t.split(" ")[0]):"kg"}" data-k="${key}" data-j="${j}" data-f="kg" value="${esc(x.kg||"")}">`:""}<button class="tick ${x.done?"on":""}" data-k="${key}" data-j="${j}" data-n="${plan}" data-def="${esc(def)}">${x.done?"✓":"○"}</button></div>`}).join("")}
  <button class="mini-btn" data-addset="${key}">＋ Add a set</button>${e.custom?` <button class="mini-btn" data-del="${e.id}">Remove this exercise</button>`:""}</div></div>`}
 function today(wk,day){const s=D.sess[day];const ck=`${W}-${day}-class`,CL=get(ck),wkey=K(W,day,"walk"),WL=get(wkey),sk=`${W}-${day}-sum`,SM=get(sk);
  let tags=`<span class="tag">Week ${wk.ab}</span>`+(wk.type==="Deload"?`<span class="tag del">Easy week: 2 sets</span>`:"")+(wk.n===1?`<span class="tag del">Finding your weights</span>`:"")+(wk.test&&day==="Tue"?`<span class="tag test">Pull-up test today</span>`:"");

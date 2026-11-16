@@ -189,7 +189,7 @@ const MF=[["waist","Waist"],["hips","Hips"],["arm","Arm"]];
 function measCard(w){const k=`m-${w}`,M=get(k);let ch="";
  MF.forEach(([f,lab])=>{let first=null,fw=0;for(let i=1;i<=w;i++){const v=num(get(`m-${i}`)[f]);if(v){first=v;fw=i;break}}const now=num(M[f]);
   if(first!=null&&now&&fw<w){const d=+(now-first).toFixed(2);ch+=`<span>${lab}: ${d>0?"+":""}${d} in since week ${fw}</span>`}});
- return`<div class="cls"><b>📏 Measurements, week ${w}</b><div class="tip">Measure once a week on Monday morning (or the first morning you can that week), before eating, relaxed, same tape. Waist: at your belly button. Hips: widest point. Arm: middle of the upper arm, same arm each time, relaxed.</div><div class="sum">
+ return`<div class="cls"><b>📏 Measurements, week ${w}</b><div class="tip">Measure once a week, Monday or the first day you can, after a few hours without food (morning or afternoon), relaxed, same tape. Fill in what you have; the card stays on Today until all three are in. Waist: at your belly button. Hips: widest point. Arm: middle of the upper arm, same arm each time, relaxed.</div><div class="sum">
  <div><label>Waist (in)</label><input inputmode="decimal" data-o="${k}" data-f="waist" value="${esc(M.waist||"")}"></div><div><label>Hips (in)</label><input inputmode="decimal" data-o="${k}" data-f="hips" value="${esc(M.hips||"")}"></div>
  <div><label>Arm (in)</label><input inputmode="decimal" data-o="${k}" data-f="arm" value="${esc(M.arm||"")}"></div><div><label>Weight (kg, optional)</label><input inputmode="decimal" data-o="${k}" data-f="kg" value="${esc(M.kg||"")}"></div></div>${ch?`<div class="tot">${ch}</div>`:""}</div>`}
 function measTable(){const rows=[];for(let w=1;w<=12;w++){const M=get(`m-${w}`);if(M.waist||M.hips||M.arm||M.kg)rows.push(`<tr><td>${w}</td><td>${esc(M.waist||"")}</td><td>${esc(M.hips||"")}</td><td>${esc(M.arm||"")}</td><td>${esc(M.kg||"")}</td></tr>`)}
@@ -207,7 +207,7 @@ function today(wk,day){const s=D.sess[day];const ck=`${W}-${day}-class`,CL=get(c
  <div class="mode"><button class="${CL.mode!=="extra"?"on":""}" data-mode="instead">Instead of today's session</button><button class="${CL.mode==="extra"?"on":""}" data-mode="extra">As an extra</button></div>
  <div class="row"><select data-o="${ck}" data-f="type"><option value="">Choose…</option>${D.classes.map(c=>`<option ${CL.type===c?"selected":""}>${esc(c)}</option>`).join("")}</select><input placeholder="Class name (optional)" data-o="${ck}" data-f="name" value="${esc(CL.name||"")}"></div>
  <div class="row2"><input inputmode="numeric" placeholder="minutes" data-o="${ck}" data-f="min" value="${esc(CL.min||"")}"><input inputmode="numeric" placeholder="kcal (watch)" data-o="${ck}" data-f="kcal" value="${esc(CL.kcal||"")}"><button class="tick ${CL.done?"on":""}" data-flag="${ck}">${CL.done?"✓":"○"}</button></div></details>`;
- if(DI===0)h+=measCard(W);
+ {const M=get(`m-${W}`);if(DI===0||!(M.waist&&M.hips&&M.arm))h+=measCard(W);}
  const groups=listFor(W,day);
  groups.forEach(g=>{h+=`<div class="grp">${eqIcon(g.eq)} ${esc(g.eq)}${g.items.length>1?` · ${g.items.length} exercises together`:""}</div>`;g.items.forEach(({e,r})=>{h+=card(e,r,K(W,day,e.id),lastTime(W,DI,e,r.name))})});
  h+=`<details class="cls"><summary>＋ Add an exercise</summary><div class="frm"><div class="full"><label>Exercise</label><input id="cx-name" placeholder="e.g. Cable triceps pushdown"></div>

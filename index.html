@@ -271,11 +271,9 @@ function plan(){const n=Object.keys(DB).length;
  <h3>Apple Watch ring goals</h3><table class="cal"><tr><th>🔴 Move</th><th>🟢 Exercise</th><th>🔵 Stand</th></tr><tr><td>450 kcal a day</td><td>30 min a day</td><td>10 hours a day</td></tr></table><p style="font-size:14px">The same every day for all 12 weeks.</p>
  <p style="font-size:14px">Set these on your watch (Fitness app on iPhone, your profile, Change Goals). Move counts active calories only, not the calories your body burns at rest. If the Week tab says you're well above or below the Move goal, use its suggestion.</p>
  <details><summary><b>Log my rings with one tap (Shortcuts)</b></summary><ol style="font-size:14px;padding-left:20px">
- <li>Open the Shortcuts app, tap ＋, name it "Log my rings".</li>
- <li>Add "Find Health Samples": Type <b>Active Energy</b>, Start Date <b>is today</b>. Then add "Calculate Statistics": <b>Sum</b>. Rename the result Move.</li>
- <li>Repeat for <b>Exercise Minutes</b> (Sum), <b>Stand Hours</b> (Count) and <b>Steps</b> (Sum). If a type isn't listed on your phone, skip it and type that number in the app.</li>
- <li>Add "URL" with: <code>https://ai16aau.github.io/fitness-plan/#watch&amp;move=[Move]&amp;ex=[Exercise]&amp;stand=[Stand]&amp;steps=[Steps]</code> (insert each result as a variable), then add "Open URLs".</li>
- <li>Run it at the end of the day, or set an Automation for 9:30pm. It fills in today's rings card. Your data stays in the link after the # sign, which never leaves your phone.</li>
+ <li>Use the "Log my rings" shortcut (signed on your Mac and AirDropped to your iPhone), or build it: Find Health Samples, Type <b>Active Calories</b>, Start Date <b>is today</b>, then Calculate Statistics <b>Sum</b>. Do the same for <b>Exercise Minutes</b> and <b>Steps</b>.</li>
+ <li>Add a URL: <code>https://ai16aau.github.io/fitness-plan/#watch&amp;move=[Move]&amp;ex=[Exercise]&amp;steps=[Steps]</code>, then Open URLs.</li>
+ <li>Run it at the end of the day, or set a personal Automation for 9:30pm. It fills in Move, Exercise and Steps. Type Stand in yourself. Your numbers travel after the # sign, which never leaves your phone.</li>
  <li>The shortcut opens the page in Safari. If you use the app from your home screen, turn on sync below so both copies share the numbers.</li></ol></details>
  <h3>Getting stronger</h3><ul>${D.progress.map(r=>`<li>${esc(r)}</li>`).join("")}</ul><h3>Missed a day?</h3><ul>${D.rules.map(r=>`<li>${esc(r)}</li>`).join("")}</ul>`}
 function go(dx){DI+=dx;if(DI>6){if(W<12){W++;DI=0}else DI=6}if(DI<0){if(W>1){W--;DI=6}else DI=0}render();scrollTo(0,0)}

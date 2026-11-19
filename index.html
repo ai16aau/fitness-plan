@@ -148,7 +148,7 @@ function missed(w,di){return w>=1&&(isPast(w,di)||isRest(w,DAYS[di]))&&!anyDone(
 function carriedAll(w,di){if(w<1||isRest(w,DAYS[di]))return[];const out=[];let[pw,pd]=prevDay(w,di),n=0;
  while(pw>=1&&n<7&&missed(pw,pd)){const d=DAYS[pd];out.unshift({w:pw,d,skip:!!get(`${pw}-${d}-skipcu`).v});n++;[pw,pd]=prevDay(pw,pd)}return out}
 const carried=(w,di)=>carriedAll(w,di).filter(x=>!x.skip);
-const goalsFor=w=>w<=4?{move:400,ex:30,stand:10}:w<=8?{move:450,ex:30,stand:10}:{move:500,ex:35,stand:10};
+const goalsFor=w=>({move:450,ex:30,stand:10});
 const WKMIN=210;
 function weekMin(w){let m=0;DAYS.forEach(d=>{m+=Math.max(num(get(`${w}-${d}-dayw`).exmin),dayMin(w,d))});return m}
 function carryNote(w,di){const day=DAYS[di],N=D.daynames;
@@ -248,7 +248,7 @@ function today(wk,day){const s=D.sess[day];const ck=`${W}-${day}-class`,CL=get(c
  <div class="tot"><span>Today: ${dayMin(W,day)} min</span><span>${dayKcal(W,day)} active kcal (walk + class + workout)</span></div></div>`;
  const dk=`${W}-${day}-dayw`,DW=get(dk);
  const G=goalsFor(W),ring=(v,g,u,lab,f,col)=>{const n=num(v),pc=Math.min(100,g?100*n/g:0);return`<div><label>${lab} <span style="opacity:.7">(goal ${g}${u})</span></label><input inputmode="numeric" data-o="${dk}" data-f="${f}" value="${esc(v||"")}"><div class="prog" style="margin-top:6px;height:6px"><i style="width:${pc}%;background:${col}"></i></div>${n>=g?`<div style="font-size:12px;color:${col};font-weight:700">✓ Ring closed</div>`:""}</div>`};
- h+=`<div class="cls"><b>⭕ Apple Watch rings for the whole day</b><div class="tip">Enter these at the end of the day from the Fitness app, or tap your "Log my rings" shortcut. Week ${W} goals: Move ${G.move} kcal, Exercise ${G.ex} min, Stand ${G.stand} hours.</div><div class="sum">
+ h+=`<div class="cls"><b>⭕ Apple Watch rings for the whole day</b><div class="tip">Enter these at the end of the day from the Fitness app, or tap your "Log my rings" shortcut. Daily goals: Move ${G.move} kcal, Exercise ${G.ex} min, Stand ${G.stand} hours.</div><div class="sum">
  ${ring(DW.akcal,G.move," kcal","🔴 Move (active kcal)","akcal","#d9534f")}${ring(DW.exmin,G.ex," min","🟢 Exercise (minutes)","exmin","#4c9a5b")}
  ${ring(DW.stand,G.stand," h","🔵 Stand (hours)","stand","#3d7eb5")}<div><label>Steps (optional)</label><input inputmode="numeric" data-o="${dk}" data-f="steps" value="${esc(DW.steps||"")}"></div></div></div>`;
  return h+`<button class="btn" id="goNext">${W===12&&DI===6?"Plan complete 🎉":"Next day ›"}</button>`}
@@ -268,7 +268,7 @@ function plan(){const n=Object.keys(DB).length;
  <p style="font-size:13px;color:var(--mute)">🟡 easy week (2 sets) · 🎯 pull-up test week · tap a week to open it</p>
  <button class="btn alt" id="exp">⬇️ Download backup</button><label class="btn alt" style="text-align:center">⬆️ Restore from backup<input type="file" id="imp" accept=".json,application/json" style="display:none"></label><button class="btn alt" id="csv">📊 Download log as spreadsheet (CSV)</button>
  ${measTable()}
- <h3>Apple Watch ring goals</h3><table class="cal"><tr><th>Weeks</th><th>🔴 Move</th><th>🟢 Exercise</th><th>🔵 Stand</th></tr><tr><td>1 to 4</td><td>400 kcal</td><td>30 min</td><td>10 h</td></tr><tr><td>5 to 8</td><td>450 kcal</td><td>30 min</td><td>10 h</td></tr><tr><td>9 to 12</td><td>500 kcal</td><td>35 min</td><td>10 h</td></tr></table>
+ <h3>Apple Watch ring goals</h3><table class="cal"><tr><th>🔴 Move</th><th>🟢 Exercise</th><th>🔵 Stand</th></tr><tr><td>450 kcal a day</td><td>30 min a day</td><td>10 hours a day</td></tr></table><p style="font-size:14px">The same every day for all 12 weeks.</p>
  <p style="font-size:14px">Set these on your watch (Fitness app on iPhone, your profile, Change Goals). Move counts active calories only, not the calories your body burns at rest. If the Week tab says you're well above or below the Move goal, use its suggestion.</p>
  <details><summary><b>Log my rings with one tap (Shortcuts)</b></summary><ol style="font-size:14px;padding-left:20px">
  <li>Open the Shortcuts app, tap ＋, name it "Log my rings".</li>

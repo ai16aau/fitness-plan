@@ -98,15 +98,23 @@ const GH="https://api.github.com",FILE="fitness-plan-progress.json";
 const gh=(path,opt={})=>fetch(GH+path,{...opt,headers:{"Authorization":"token "+C.token,"Accept":"application/vnd.github+json",...(opt.body?{"Content-Type":"application/json"}:{})}}).then(async r=>{if(!r.ok)throw new Error(r.status+" "+(await r.text()).slice(0,80));return r.json()});
 let syncT=null,syncing=false;
 function queueSync(){if(!C.token)return;clearTimeout(syncT);syncT=setTimeout(sync,2500)}
+let checkedCopies=false,forcePush=false,copies=0;
 async function sync(){if(!C.token||syncing)return;if(!navigator.onLine){syncMsg="Offline: saved on this phone, will sync later";updSync();return}
  syncing=true;syncMsg="Syncing…";updSync();
- try{if(!C.gist){const list=await gh("/gists?per_page=100");const g=list.find(x=>x.files&&x.files[FILE]);if(g){C.gist=g.id;saveC()}}
+ try{
+  // once per session (and whenever no backup is set), find every backup copy, merge them all, and settle on the oldest one so every device uses the same copy
+  if(!C.gist||!checkedCopies){const list=await gh("/gists?per_page=100");const cands=list.filter(x=>x.files&&x.files[FILE]).sort((a,b)=>a.created_at<b.created_at?-1:1);
+   if(cands.length){const canon=cands[0].id;let merged=false;
+    for(const g of cands){if(g.id===canon&&cands.length===1)break;if(g.id===canon)continue;try{const full=await gh("/gists/"+g.id);const f=full.files[FILE];if(!f)continue;let txt=f.content;if(f.truncated)txt=await fetch(f.raw_url).then(r=>r.text());const other=JSON.parse(txt);
+     for(const k in other){const r=other[k],l=DB[k];if(r&&(!l||(r.t||"")>(l.t||""))){DB[k]=r;merged=true}}}catch(e){}}
+    if(merged){try{LS&&LS.setItem(KEY,JSON.stringify(DB))}catch(e){}}
+    if(C.gist!==canon){C.gist=canon;saveC();merged=true}copies=cands.length;checkedCopies=true;if(merged)forcePush=true}}
   let remote={};if(C.gist){const g=await gh("/gists/"+C.gist);const f=g.files[FILE];if(f){let txt=f.content;if(f.truncated)txt=await fetch(f.raw_url).then(r=>r.text());try{remote=JSON.parse(txt)}catch(e){remote={}}}}
   let changedLocal=false,changedRemote=false;
   for(const k in remote){const r=remote[k],l=DB[k];if(!l||(r.t||"")>(l.t||"")){DB[k]=r;changedLocal=true}}
   for(const k in DB){const r=remote[k],l=DB[k];if(!r||(l.t||"")>(r.t||""))changedRemote=true}for(const k in remote){if(/^\d+-/.test(k)&&(remote[k].t||"")<RESTART)changedRemote=true}
   archiveOld();if(changedLocal){try{LS&&LS.setItem(KEY,JSON.stringify(DB))}catch(e){}}
-  if(changedRemote||!C.gist){const body=JSON.stringify({description:"Fitness plan progress (private backup)",files:{[FILE]:{content:JSON.stringify(DB)}}});
+  if(changedRemote||forcePush||!C.gist){forcePush=false;const body=JSON.stringify({description:"Fitness plan progress (private backup)",files:{[FILE]:{content:JSON.stringify(DB)}}});
    if(C.gist)await gh("/gists/"+C.gist,{method:"PATCH",body});else{const g=await gh("/gists",{method:"POST",body:JSON.stringify({...JSON.parse(body),public:false})});C.gist=g.id;saveC()}}
   C.last=now();saveC();syncMsg="☁️ Synced "+new Date().toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"});if(changedLocal)render();
  }catch(e){syncMsg=String(e.message).startsWith("401")?"Sync key not accepted. Check it on the Plan tab.":"Couldn't sync just now: saved on this phone"}
@@ -281,7 +289,7 @@ function week(wk){let tk=0,tm=0,da=0,dt=0,st=0,sn=0,mv=0,nm=0;const G=goalsFor(W
  return`<div class="hero"><h2>Week ${wk.n}</h2><div style="font-size:14px">${esc(wk.focus)}</div><div class="tot"><span>⏱️ ${weekMin(W)} of ${WKMIN} exercise minutes</span><span>${DAYS.filter((d,i)=>missed(W,i)).length} missed or rest day(s)</span></div><div class="tot"><span>${tm} min logged</span><span>${tk} active kcal (workouts)</span></div>${nm||sn||cs||ce?`<div class="tot"><span>Rings closed: 🔴 ${cm}/7 · 🟢 ${ce}/7 · 🔵 ${cs}/7</span>${nm>=5&&mv/nm>G.move*1.15?`<span>Your Move average is ${Math.round(mv/nm)} kcal, well above the goal. Try ${Math.round(mv/nm/10)*10} on your watch.</span>`:nm>=5&&mv/nm<G.move*0.8?`<span>Your Move average is ${Math.round(mv/nm)} kcal. Set your watch to ${Math.round(mv/nm*1.05/10)*10} for now and build up.</span>`:""}<span>${sn?Math.round(st/sn).toLocaleString("en-GB")+" steps a day":""}</span></div>`:""}</div><table class="wk">${rows}</table>`+measCard(W)}
 function plan(){const n=Object.keys(DB).length;
  return`<h3>Save your progress to the cloud</h3><div class="cls"><div class="tip" style="margin-top:0">Your ticks and numbers always save on this phone. Turn on sync to also back them up to a private, secret file in your GitHub account, so nothing is lost if Safari clears its data, and so it matches on every device (Safari, the home screen app and your laptop).</div>
- ${C.token?`<p>☁️ Sync is on. ${C.last?"Last synced "+new Date(C.last).toLocaleString("en-GB",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"}):""}</p><button class="btn" id="syncnow">Sync now</button><button class="btn alt" id="pairlink">📱 Copy a link for my other devices</button><div class="tip" id="pairmsg"></div><button class="btn alt" id="unsync">Turn off sync on this device</button>`
+ ${C.token?`<p>☁️ Sync is on. ${C.last?"Last synced "+new Date(C.last).toLocaleString("en-GB",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"}):""}${syncMsg&&!/Synced/.test(syncMsg)?` · <b>${esc(syncMsg)}</b>`:""}</p><p style="font-size:13px">Backup code: <b>${esc((C.gist||"none yet").slice(-6))}</b>${copies>1?` (merged ${copies} copies into one)`:""}. Your phone and laptop should show the same code. This copy is ${navigator.standalone||matchMedia("(display-mode: standalone)").matches?"the home-screen app":"a browser tab"}; each one is linked separately.</p><button class="btn" id="syncnow">Sync now</button><button class="btn alt" id="pairlink">📱 Copy a link for my other devices</button><div class="tip" id="pairmsg"></div><button class="btn alt" id="unsync">Turn off sync on this device</button>`
  :`<ol style="font-size:14px;padding-left:18px"><li>On GitHub, open <b>Settings → Developer settings → Personal access tokens → Tokens (classic)</b>.</li><li>Tap <b>Generate new token (classic)</b>, name it "Fitness plan", set the expiry to 1 year, and tick only <b>gist</b>.</li><li>Copy the token and paste it below. <b>Already set up on another device?</b> There, tap "Copy a link for my other devices" in this tab, then paste that link here instead.</li><li><b>Then do the same on your laptop</b> (open this website there, Plan tab, paste the same token). After that, anything you log on your phone shows on your laptop within about 30 seconds, and the other way round.</li></ol>
  <div class="frm"><div class="full"><input id="tok" placeholder="Paste your token or the link from your other device" autocomplete="off"></div></div><button class="btn" id="connect" style="margin-top:10px">Turn on sync</button>`}
  <div class="tip">${n} items saved on this device.</div></div>

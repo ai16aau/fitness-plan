@@ -189,20 +189,26 @@ function lastTime(w,di,e,name){for(let ww=w;ww>=0;ww--)for(let dd=(ww===w?di-1:6
    const R=res(e,locOf(ww,d));
    return{txt:`Last time (${ww?`week ${ww}, ${d}`:`before the restart, ${d}`}): `+s.map(x=>(x.r||"?")+(x.kg?` @ ${x.kg} kg${R.assist?" assist":""}`:"")).join(", "),s,R,plan:Math.min(e.sets,setsN(e,ww,R))}}}return null}
 const botOf=r=>{const m=String(r).match(/\d+/);return m?+m[0]:0};
+function homeDBs(){const v=String(get("cfg-homedb").v||"4, 7").match(/\d+(\.\d+)?/g)||["7"];return[...new Set(v.map(Number))].filter(x=>x>0).sort((a,b)=>a-b)}
 function plan2(lt,r){if(!lt)return null;const kg=r.kg!==false,as=!!r.assist,top=topOf(r.reps),bot=botOf(r.reps);
  const kgs=lt.s.map(x=>num(x.kg)).filter(Boolean);
  // judge on working sets: the heaviest weight used (or lightest assist); ignore warm-up sets
- const ref=kgs.length?(as?Math.min(...kgs):Math.max(...kgs)):0;
- const work=kgs.length?lt.s.filter(x=>num(x.kg)===ref):lt.s;const reps=work.map(x=>+x.r||0);
+ const raw=kgs.length?(as?Math.min(...kgs):Math.max(...kgs)):0;
+ const work=kgs.length?lt.s.filter(x=>num(x.kg)===raw):lt.s;const reps=work.map(x=>+x.r||0);
  const enough=work.length>=Math.min(2,lt.plan),best=Math.max(...reps),avg=reps.reduce((a,b)=>a+b,0)/reps.length;
- const db=r.equip.startsWith("dumbbell"),step=as?5:db?(ref<10?1:2):2.5,u=as?" kg assist":r.load==="kg per dumbbell"?" kg each hand":r.load==="kg total incl. bar"?" kg in total, bar included":r.load==="kg of plates (not the bar)"?" kg of plates":" kg";
+ const db=r.equip.startsWith("dumbbell")||/dumbbell/i.test(r.load||"");
+ const home=locOf(W,DAYS[DI])==="Home"&&!as&&db&&kg,HAVE=homeDBs(),MAX=Math.max(...HAVE);
+ // at home, never suggest more than the heaviest dumbbell she owns; a logged 14 with 7 kg dumbbells is both dumbbells added together
+ let ref=raw,note="";if(home&&ref>MAX){note=ref/2<=MAX?` (Last time's ${ref} kg looks like both dumbbells added together; log the weight of one dumbbell.)`:"";ref=ref/2<=MAX?ref/2:MAX}
+ const step=as?5:db?(ref<10?1:2):2.5,u=as?" kg assist":r.load==="kg per dumbbell"?" kg each hand":r.load==="kg total incl. bar"?" kg in total, bar included":r.load==="kg of plates (not the bar)"?" kg of plates":" kg";
  const way=enough&&avg>=top+4,hit=enough&&reps.every(n=>n>=top),under=reps.every(n=>n<bot-1);
  // a single set far past the range still counts: weight is clearly too light
- const jump=way||best>=top+6?2:hit?1:0;
- const home=locOf(W,DAYS[DI])==="Home"&&!as&&(db||/dumbbell/i.test(r.load||""));
- if(jump&&ref&&kg&&home){const nx=[4,7].find(x=>x>ref);if(nx)return{t:nx+u,h:`⬆️ You hit the top of the range, so move up to your ${nx} kg dumbbell${r.load==="kg per dumbbell"?"s (one in each hand)":""}. Start at the bottom of the rep range (${bot}) and build up again.`}}
- if(jump&&ref&&kg&&home&&ref+step*jump>7){if(ref>=7)return{t:"7 kg, more reps",h:"⬆️ You've outgrown the rep range, and 7 kg is your heaviest dumbbell at home. Make it harder instead: add 2 to 3 reps to every set, or lower over 3 seconds. (The gym is where this one can go heavier.)"};
-  return{t:"7"+u,h:`⬆️ You hit the top of the range, so go up to your 7 kg dumbbells${r.load==="kg per dumbbell"?" (one in each hand)":""}. Start at the bottom of the rep range (${bot}) and build up again.`}}
+ const jump=way||best>=top+6?2:hit?1:0;const pair=r.load==="kg per dumbbell"?"s (one in each hand)":"";
+ if(home&&ref){
+  if(jump){const nx=HAVE.find(x=>x>ref);if(nx)return{t:nx+u,h:`⬆️ You hit the top of the range, so move up to your ${nx} kg dumbbell${pair}. Start at the bottom of the rep range (${bot}) and build up again.${note}`};
+   return{t:ref+" kg, more reps",h:`⬆️ You've outgrown the rep range, and ${MAX} kg is your heaviest dumbbell at home. Make it harder instead: add 2 to 3 reps to every set, or lower over 3 seconds. (The gym is where this one can go heavier.)${note}`}}
+  if(under){const lower=[...HAVE].reverse().find(x=>x<ref);return{t:(lower||ref)+u,h:`⬇️ Below the range last time. Today use ${lower?`your ${lower} kg dumbbell${pair}`:"the same dumbbells"} and own the reps.${note}`}}
+  return{t:ref+u,h:`➡️ Same dumbbell${pair} as last time (${ref} kg). Aim for 1 more rep on at least one set.${note}`}}
  if(jump&&ref&&kg){const t=+(as?Math.max(0,ref-step*jump):ref+step*jump).toFixed(1);
   return{t:t+u,h:`${jump===2?"⏫ Way past the range last time, so jump two steps":"⬆️ You hit the top of the range, so go up one step"}: ${as?"less assist, about ":"about "}${t}${u}. Start at the bottom of the rep range (${bot}) and build up again.`}}
  if(jump)return{t:"Make it harder",h:"⬆️ Too easy last time. Make it harder today: the next push-up level, a lighter band, a weight, or 3 seconds lowering."};
@@ -296,6 +302,7 @@ function plan(){const n=Object.keys(DB).length;
  <h3>12 weeks</h3><table class="cal"><tr><th>Week</th><th>Dates</th><th>Focus</th></tr>${D.weeks.map(w=>`<tr class="${w.n===TW?"cur":""}" data-w="${w.n}"><td>${w.n}${w.type==="Deload"?" 🟡":""}${w.test?" 🎯":""}</td><td>${w.label}</td><td>${esc(w.focus)}</td></tr>`).join("")}</table>
  <p style="font-size:13px;color:var(--mute)">🟡 easy week (2 sets) · 🎯 pull-up test week · tap a week to open it</p>
  <button class="btn alt" id="exp">⬇️ Download backup</button><label class="btn alt" style="text-align:center">⬆️ Restore from backup<input type="file" id="imp" accept=".json,application/json" style="display:none"></label><button class="btn alt" id="csv">📊 Download log as spreadsheet (CSV)</button>
+ <h3>Home dumbbells</h3><p style="font-size:14px">The weights you have at home. Home targets never go above the heaviest one. Update this if you buy heavier dumbbells.</p><div class="row"><input data-o="cfg-homedb" data-f="v" value="${esc(get("cfg-homedb").v||"4, 7")}" placeholder="e.g. 4, 7"></div>
  ${measTable()}
  <h3>Apple Watch ring goals</h3><table class="cal"><tr><th>🔴 Move</th><th>🟢 Exercise</th><th>🔵 Stand</th></tr><tr><td>450 kcal a day</td><td>30 min a day</td><td>10 hours a day</td></tr></table><p style="font-size:14px">The same every day for all 12 weeks.</p>
  <p style="font-size:14px">Set these on your watch (Fitness app on iPhone, your profile, Change Goals). Move counts active calories only, not the calories your body burns at rest. If the Week tab says you're well above or below the Move goal, use its suggestion.</p>

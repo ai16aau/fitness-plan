@@ -189,6 +189,14 @@ function lastTime(w,di,e,name){for(let ww=w;ww>=0;ww--)for(let dd=(ww===w?di-1:6
    const R=res(e,locOf(ww,d));
    return{txt:`Last time (${ww?`week ${ww}, ${d}`:`before the restart, ${d}`}): `+s.map(x=>(x.r||"?")+(x.kg?` @ ${x.kg} kg${R.assist?" assist":""}`:"")).join(", "),s,R,plan:Math.min(e.sets,setsN(e,ww,R))}}}return null}
 const botOf=r=>{const m=String(r).match(/\d+/);return m?+m[0]:0};
+// sanity-check a weight as it's typed, so totals or typos don't skew future targets
+function kgCheck(val,c){const v=num(val);if(!v||c.assist)return{};const max=Math.max(...c.have);
+ if(c.home&&v>max){if(c.have.includes(v/2)||v/2<=max)return{fix:v/2,msg:`⚠️ Changed ${v} to ${v/2}: log the weight of one dumbbell, not both added together.`};
+  return{msg:`⚠️ Your heaviest dumbbell at home is ${max} kg. Check this number, or add the new weight under Home dumbbells in the Plan tab.`}}
+ if(c.prev&&c.pair&&v>=c.prev*1.8)return{msg:`⚠️ That's a lot more than last time (${c.prev} kg). This column is the weight of one dumbbell. If ${v} is both added together, change it to ${v/2}.`};
+ if(c.prev&&v>=c.prev*2.5)return{msg:`⚠️ That's a big jump from last time (${c.prev} kg). Double-check the number.`};
+ if(c.prev&&v<=c.prev/2.5)return{msg:`⚠️ That's much lighter than last time (${c.prev} kg). Double-check the number.`};
+ return{}}
 function homeDBs(){const v=String(get("cfg-homedb").v||"4, 7").match(/\d+(\.\d+)?/g)||["7"];return[...new Set(v.map(Number))].filter(x=>x>0).sort((a,b)=>a-b)}
 function plan2(lt,r){if(!lt)return null;const kg=r.kg!==false,as=!!r.assist,top=topOf(r.reps),bot=botOf(r.reps);
  const kgs=lt.s.map(x=>num(x.kg)).filter(Boolean);
@@ -233,14 +241,15 @@ function render(){MEMO={};const wk=D.weeks[W-1],day=DAYS[DI];
   if(TAB==="Today"){const L=locOf(W,day);h+=`<div class="gyms">${D.locs.map(l=>`<button class="${l===L?"on":""}" data-loc="${l}">${{"Third Space":"🏋️<small>Third Space</small>","Office gym":"🏢<small>Office</small>","PureGym":"💪<small>PureGym</small>","Gym Group":"🏃‍♀️<small>Gym Group</small>","Home":"🏠<small>Home</small>"}[l]}</button>`).join("")}</div>`}}
  h+=`<div class="sync" id="sync"></div></div>`+(TAB==="Today"?today(wk,day):TAB==="Week"?week(wk):plan())+`</div><div class="tabbar">${[["Today","📅"],["Week","🗓️"],["Plan","📋"]].map(([t,i])=>`<button class="${TAB===t?"on":""}" data-tab="${t}"><div>${i}</div>${t}</button>`).join("")}</div>`;
  document.getElementById("app").innerHTML=h;bind();updSync()}
-function card(e,r,key,lt){const P=plan2(lt,r);const plan=setsN(e,W,r),ns=plan+(get(key).extra||0);const S=get(key).s||[];const kg=r.kg!==false;const all=S.filter(x=>x&&x.done).length>=plan;const def=String(r.reps).split(" ")[0];
+function card(e,r,key,lt){const P=plan2(lt,r);const _home=locOf(W,DAYS[DI])==="Home"&&!r.assist&&(r.equip.startsWith("dumbbell")||/dumbbell/i.test(r.load||""));
+ const chk=esc(JSON.stringify({home:_home,have:homeDBs(),pair:r.load==="kg per dumbbell",assist:!!r.assist,prev:lt?Math.max(0,...lt.s.map(x=>num(x.kg)).filter(Boolean)):0}));const plan=setsN(e,W,r),ns=plan+(get(key).extra||0);const S=get(key).s||[];const kg=r.kg!==false;const all=S.filter(x=>x&&x.done).length>=plan;const def=String(r.reps).split(" ")[0];
  return`<div class="ex ${all?"all":""}">${pics(r.img,r.name)}<div class="body"><span class="eq">${eqIcon(r.equip)} ${esc(r.equip)}</span>${e.custom?'<span class="eq" style="background:var(--amber2)">Your exercise</span>':""}
  ${r.swap?`<div class="swap">${esc(locOf(W,DAYS[DI]))} version of: ${esc(r.swap)}</div>`:""}<div class="name">${esc(r.name)}</div>
  <div class="big"><div class="box"><b>${ns}</b><span>sets</span></div><div class="box"><b>${esc(r.reps)}</b><span>${e.unit==="secs"?"time":"reps"}</span></div><div class="box w"><b>${esc(P?P.t:r.start)}</b><span>${P?"today":"start"}</span></div></div>${/per (side|leg|arm)/.test(r.reps)?`<div class="note" style="margin:8px 0 0;padding:8px 10px;font-size:13px">🔁 <b>1 set = ${esc(r.reps.replace(/ per (side|leg|arm).*/,""))} on one ${(r.reps.match(/per (side|leg|arm)/)||[])[1]}, then the same on the other.</b> Do both sides before you tick the set, and type the number for one side.</div>`:""}
  ${e.cu?`<div class="tag del" style="display:inline-block;margin:6px 0">↩️ Missed on ${[...new Set(r.from.map(f=>D.daynames[f.split("|")[1]]))].join(" and ")}${r.add?` (${setsN(e,W,r)} sets in total)`:""}</div>`:r.add?`<div class="tag del" style="display:inline-block;margin:6px 0">↩️ + ${r.add} set${r.add>1?"s":""} from ${[...new Set(r.from.map(f=>D.daynames[f.split("|")[1]]))].join(" and ")}</div>`:""}${r.how?`<div class="tip" style="margin-bottom:4px"><b>Setup:</b> ${esc(r.how)}</div>`:""}<div class="tip">${r.how?"<b>How:</b> ":""}${esc(r.cue)}</div>${IMG[r.img]&&!get(slug(r.name)).data?`<label class="mini-btn" style="margin-top:6px">📷 Use my own photo<input type="file" accept="image/*" data-photo="${esc(r.name)}" hidden></label>`:""}${lt?`<div class="last">${esc(lt.txt)}</div><div class="hint">${esc(P.h)}</div>`:""}
  <div class="hdr ${kg?"":"nokg"}"><span>Set</span><span>${e.unit==="secs"?"Seconds":"Reps done"}</span>${kg?`<span>${esc(r.load||(r.assist?"kg assist":"kg used"))}</span>`:""}<span></span></div>
- ${Array.from({length:ns},(_,j)=>{const x=S[j]||{};return`<div class="setrow ${kg?"":"nokg"}"><span class="sn">${j+1}</span><input inputmode="numeric" placeholder="${esc(def)}" data-k="${key}" data-j="${j}" data-f="r" value="${esc(x.r||"")}">${kg?`<input inputmode="decimal" placeholder="${P&&/^[\d.]+ kg/.test(P.t)?esc(P.t.split(" ")[0]):"kg"}" data-k="${key}" data-j="${j}" data-f="kg" value="${esc(x.kg||"")}">`:""}<button class="tick ${x.done?"on":""}" data-k="${key}" data-j="${j}" data-n="${plan}" data-def="${esc(def)}">${x.done?"✓":"○"}</button></div>`}).join("")}
- <button class="mini-btn" data-addset="${key}">＋ Add a set</button>${e.custom?` <button class="mini-btn" data-del="${e.id}">Remove this exercise</button>`:""}</div></div>`}
+ ${Array.from({length:ns},(_,j)=>{const x=S[j]||{};return`<div class="setrow ${kg?"":"nokg"}"><span class="sn">${j+1}</span><input inputmode="numeric" placeholder="${esc(def)}" data-k="${key}" data-j="${j}" data-f="r" value="${esc(x.r||"")}">${kg?`<input inputmode="decimal" placeholder="${P&&/^[\d.]+ kg/.test(P.t)?esc(P.t.split(" ")[0]):"kg"}" data-k="${key}" data-j="${j}" data-f="kg" data-chk="${chk}" value="${esc(x.kg||"")}">`:""}<button class="tick ${x.done?"on":""}" data-k="${key}" data-j="${j}" data-n="${plan}" data-def="${esc(def)}">${x.done?"✓":"○"}</button></div>`}).join("")}
+ <div class="note" data-warn="${key}" style="display:none;margin:8px 0;padding:8px 10px;font-size:13px"></div><button class="mini-btn" data-addset="${key}">＋ Add a set</button>${e.custom?` <button class="mini-btn" data-del="${e.id}">Remove this exercise</button>`:""}</div></div>`}
 const MF=[["waist","Waist"],["hips","Hips"],["arm","Arm"]];
 function measCard(w){const k=`m-${w}`,M=get(k);let ch="";
  MF.forEach(([f,lab])=>{let first=null,fw=0;for(let i=1;i<=w;i++){const v=num(get(`m-${i}`)[f]);if(v){first=v;fw=i;break}}const now=num(M[f]);
@@ -322,6 +331,8 @@ function bind(){const $=id=>document.getElementById(id),Q=s=>document.querySelec
  Q("[data-tab]").forEach(b=>b.onclick=()=>{TAB=b.dataset.tab;render();scrollTo(0,0)});
  Q("[data-w]").forEach(b=>b.onclick=()=>{W=+b.dataset.w;TAB="Week";render();scrollTo(0,0)});
  Q("input[data-f][data-k]").forEach(i=>i.oninput=()=>setv(i.dataset.k,+i.dataset.j,i.dataset.f,i.value));
+ Q("input[data-chk]").forEach(i=>i.onchange=()=>{const w=document.querySelector(`[data-warn="${i.dataset.k}"]`),m=kgCheck(i.value,JSON.parse(i.dataset.chk));
+  if(m.fix!=null){i.value=m.fix;setv(i.dataset.k,+i.dataset.j,"kg",String(m.fix))}if(w){w.style.display=m.msg?"block":"none";w.textContent=m.msg||""}});
  Q("[data-o]").forEach(i=>{const f=()=>{put(i.dataset.o,{[i.dataset.f]:i.value});const tt=document.querySelector(".tot");};i.oninput=f;i.onchange=f});
  Q("[data-flag]").forEach(b=>b.onclick=()=>{const k=b.dataset.flag;put(k,{done:!get(k).done});render()});
  Q("[data-rest]").forEach(b=>b.onclick=()=>{const k=b.dataset.rest;put(k,{v:!get(k).v});render()});

@@ -40,4 +40,13 @@ let fails=0;const ok=(c,m)=>{console.log((c?'PASS ':'FAIL ')+m);if(!c)fails++};
  {const p=await page({"1-Fri-class":{type:"Treadmill walk",min:"60",done:true,t:T}},'2026-11-20T10:00:00Z');
   const [c,t]=await p.evaluate(()=>dayStat(W,DI));ok(c===0&&t>0,'treadmill walk as an extra leaves the session to do');}
 
+ // 7. Every home target, on every day, is a dumbbell she owns, whatever the history (none, gym weights, totals, odd numbers)
+ {const days=["Thu","Fri","Sat","Sun","Mon","Tue","Wed"];const p0=await page({},'2026-11-26T10:00:00Z');
+  const ids=await p0.evaluate(()=>{const o={};DAYS.forEach(d=>{o[d]=ownItems(1,d).map(x=>x.e.id)});return o});
+  for(const w of [null,["6","10"],["8","12"],["14","15"],["9","8"],["2","5"]]){const s={};days.forEach(d=>{s[`2-${d}-loc`]={v:"Home",t:T};if(w){s[`1-${d}-loc`]={v:"Gym Group",t:T};ids[d].forEach(id=>s[`1-${d}-${id}`]=S(3,w[1],w[0]))}});
+   const q=await page(s,'2026-11-26T10:00:00Z');
+   const bad=await q.evaluate(()=>{const out=[];const have=homeDBs();for(let di=0;di<7;di++){DI=di;W=2;render();document.querySelectorAll('.ex').forEach(ex=>{const t=(ex.querySelector('.box.w b')||{}).textContent||"";
+     const label=ex.innerText.split('\n').find(l=>/kg (per dumbbell|\(one dumbbell\))/i.test(l));if(label||/dumbbell/i.test(t))[...t.matchAll(/(\d+(\.\d+)?) kg/g)].map(m=>+m[1]).forEach(k=>{if(!have.includes(k))out.push(DAYS[di]+': '+t)})})}return out});
+   ok(!bad.length,`home targets all owned dumbbells (history: ${w?w[0]+' kg':'none'})`+(bad.length?' '+bad.join(', '):''))}}
+
  await b.close();console.log(fails?`${fails} check(s) failed`:'All checks passed');process.exit(fails?1:0)})();

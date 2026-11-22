@@ -1,0 +1,18 @@
+.gyms{grid-template-columns:repeat(5,1fr)!important}.gyms button{font-size:12px!important;padding:6px 0!important}
+.eq{display:inline-block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;background:var(--slate2);color:var(--ink);padding:3px 8px;border-radius:99px;margin-bottom:4px}
+.grp{font-size:13px;font-weight:700;color:var(--mute);text-transform:uppercase;letter-spacing:.05em;margin:18px 4px 8px}
+.swap{font-size:12px;color:var(--rose);font-weight:600;margin-bottom:2px}
+.hint{font-size:13px;margin-top:6px;background:var(--teal2);color:var(--teal);padding:6px 10px;border-radius:10px;font-weight:600}
+.frm{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}.frm .full{grid-column:1/-1}
+.frm input,.frm select,.sum input{width:100%;height:44px;border:1px solid var(--line);border-radius:10px;padding:0 10px;background:var(--bg);color:var(--ink);font-size:16px}
+.frm label,.sum label{font-size:12px;color:var(--mute);display:block;margin-bottom:3px}
+.sum{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.mini-btn{border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:10px;padding:6px 10px;font-size:13px;margin-top:8px}
+.sync{font-size:12px;color:var(--mute);text-align:center;margin-top:4px}
+.walkrow{display:grid;grid-template-columns:1fr 1fr 52px;gap:8px;margin-top:8px}.walkrow input{height:44px;border:1px solid var(--line);border-radius:10px;padding:0 8px;background:var(--bg);color:var(--ink);font-size:16px;width:100%}
+.cls .row{grid-template-columns:1fr 1fr!important}.cls .row2{display:grid;grid-template-columns:1fr 1fr 52px;gap:8px;margin-top:8px}.cls .row2 input{height:44px;border:1px solid var(--line);border-radius:10px;padding:0 8px;background:var(--bg);color:var(--ink);font-size:16px;width:100%}
+.tot{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}.tot span{background:var(--card);border-radius:10px;padding:6px 10px;font-size:13px}
+.gyms button{display:flex;flex-direction:column;align-items:center;gap:1px;font-size:18px!important;padding:5px 0!important;border-radius:14px!important;line-height:1.1}.gyms button small{font-size:10px;white-space:nowrap}
+.nophoto{background:var(--slate2);padding:18px 14px;text-align:center;display:flex;flex-direction:column;gap:4px;align-items:center}.nophoto div:first-child{font-size:34px}.nophoto span{font-size:13px;color:var(--mute)}
+.phbar{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;padding:6px}.pics.one{grid-template-columns:1fr}.pics.one img{aspect-ratio:auto;max-height:340px;object-fit:contain;background:#000}
+a.mini-btn,label.mini-btn{display:inline-block;text-decoration:none;cursor:pointer}

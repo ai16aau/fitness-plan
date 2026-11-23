@@ -1,15 +1,15 @@
 import json, datetime as dt
-START = dt.date(2026,11,19)
+START = dt.date(2026,11,23)
 FOCUS = {1:"Find your working weights; stop sets with about 3 reps spare",2:"Complete all sets and add reps",3:"Keep adding reps; go heavier where the app says so",
-4:"Add weight where earned; less pull-up assistance if ready",5:"First unassisted pull-up attempt",6:"Christmas easy week: 2 sets, shorter sessions",
-7:"Back to full sets; pick up where you left off",8:"Highest volume week",9:"Strength focus; unassisted pull-up test",
+4:"Add weight where earned; less pull-up assistance if ready",5:"Christmas easy week: 2 sets, shorter sessions",6:"Back to full sets; first unassisted pull-up attempt",
+7:"Add weight where earned; less pull-up assistance if ready",8:"Highest volume week",9:"Strength focus; unassisted pull-up test",
 10:"Easy week: 2 sets, recover before the final push",11:"Controlled personal bests; one or two pull-up attempts",12:"Final week: test 1 to 2 pull-ups, take your final measurements"}
-TESTS = {5,9,11,12}
+TESTS = {6,9,11,12}
 weeks=[]
 for n in range(1,13):
     s=START+dt.timedelta(weeks=n-1); e=s+dt.timedelta(days=6)
-    typ = "Deload" if n in (6,10) else ("Calibration" if n==1 else "Normal")
-    rir = "3 to 4" if n in (6,10) else ("3" if n==1 else "2")
+    typ = "Deload" if n in (5,10) else ("Calibration" if n==1 else "Normal")
+    rir = "3 to 4" if n in (5,10) else ("3" if n==1 else "2")
     weeks.append(dict(n=n,start=s.isoformat(),end=e.isoformat(),label=f"{s.day} {s.strftime('%b')} to {e.day} {e.strftime('%b')}",
         ab="A" if n%2 else "B",type=typ,rir=rir,test=n in TESTS,focus=FOCUS[n]))
 LOC=["Third Space","Office gym","PureGym","Home"]
@@ -70,7 +70,7 @@ PROGRESS=["Start each exercise at a weight that leaves the stated reps in reserv
 "Then add weight (or reduce pull-up assistance) and drop back to the bottom of the range.","Change only one thing at a time: weight, reps or assistance.",
 "Pull-up bands, easiest to hardest: green, purple, black, red, yellow, none. Move down a band after 3 × 8.",
 "Unassisted pull-up test (test weeks only): one attempt after warming up, before assisted sets."]
-DAYS=["Thu","Fri","Sat","Sun","Mon","Tue","Wed"]
+DAYS=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"]
 DAYNAME=dict(Mon="Monday",Tue="Tuesday",Wed="Wednesday",Thu="Thursday",Fri="Friday",Sat="Saturday",Sun="Sunday")
 def session_for(day,ab):
     s=SESS[day]; out=[]

@@ -6,10 +6,12 @@ const now=()=>new Date().toISOString();
 let DB={};try{DB=JSON.parse((LS&&LS.getItem(KEY))||"{}")}catch(e){DB={}}
 // migrate old values
 for(const k in DB){if(typeof DB[k]!=="object"||DB[k]===null)DB[k]={v:DB[k]};if(!DB[k].t)DB[k].t="2026-11-01T00:00:00.000Z"}
-// plan restarted on 9 Nov, 19 Nov and 23 Nov 2026: earlier logs move to week 0 so "last time" still works
-const DOGEND=new Date(2027,0,5,23,59);const RESTART="2026-11-10T00:00:00.000Z",RESTART3="2026-11-23T00:00:00.000Z";
-function archiveOld(){let n=0;for(const k of Object.keys(DB)){const t=DB[k].t||"";if(/^\d+-/.test(k)&&t<RESTART){const a="arch-"+k;if(!DB[a])DB[a]=DB[k];delete DB[k];n++}
- else if(/^[1-9]\d*-/.test(k)&&t<RESTART3){const nk=k.replace(/^\d+-/,"0-");if(!DB[nk]||(DB[nk].t||"")<t){if(DB[nk]&&!DB["arch-"+nk])DB["arch-"+nk]=DB[nk];DB[nk]=DB[k]}else if(!DB["arch-"+k])DB["arch-"+k]=DB[k];delete DB[k];n++}}if(n){try{LS&&LS.setItem(KEY,JSON.stringify(DB))}catch(e){}}return n}
+// plan restarts: everything logged before a restart moves to week 0 so "last time" still works. The built-in restart is Sat 28 Nov 2026; the Restart button on the Plan tab adds its own (cfg-restart: start date and time), which syncs like everything else
+const DOGEND=new Date(2027,0,5,23,59);const RESTART="2026-11-10T00:00:00.000Z",RESTART_BAKED="2026-11-28T00:00:00.000Z",BAKED_START=D.weeks[0].start;
+const restartAt=()=>{const r=DB["cfg-restart"];return r&&r.at&&r.at>RESTART_BAKED?r.at:RESTART_BAKED};
+const planStart=()=>{const r=DB["cfg-restart"];return r&&r.at&&r.at>RESTART_BAKED&&/^\d{4}-\d{2}-\d{2}$/.test(r.start||"")?r.start:BAKED_START};
+function archiveOld(){const RS=restartAt();let n=0;for(const k of Object.keys(DB)){const t=DB[k].t||"";if(/^\d+-/.test(k)&&t<RESTART){const a="arch-"+k;if(!DB[a])DB[a]=DB[k];delete DB[k];n++}
+ else if(/^[1-9]\d*-/.test(k)&&t<RS){const nk=k.replace(/^\d+-/,"0-");if(!DB[nk]||(DB[nk].t||"")<t){if(DB[nk]&&!DB["arch-"+nk])DB["arch-"+nk]=DB[nk];DB[nk]=DB[k]}else if(!DB["arch-"+k])DB["arch-"+k]=DB[k];delete DB[k];n++}}if(n){try{LS&&LS.setItem(KEY,JSON.stringify(DB))}catch(e){}}return n}
 archiveOld();
 let C={};try{C=JSON.parse((LS&&LS.getItem(CFG))||"{}")}catch(e){C={}}
 const saveC=()=>{try{LS&&LS.setItem(CFG,JSON.stringify(C))}catch(e){}};
@@ -37,21 +39,27 @@ async function sync(){if(!C.token||syncing)return;if(!navigator.onLine){syncMsg=
   let remote={};if(C.gist){const g=await gh("/gists/"+C.gist);const f=g.files[FILE];if(f){let txt=f.content;if(f.truncated)txt=await fetch(f.raw_url).then(r=>r.text());try{remote=JSON.parse(txt)}catch(e){remote={}}}}
   let changedLocal=false,changedRemote=false;
   for(const k in remote){const r=remote[k],l=DB[k];if(!l||(r.t||"")>(l.t||"")){DB[k]=r;changedLocal=true}}
-  for(const k in DB){const r=remote[k],l=DB[k];if(!r||(l.t||"")>(r.t||""))changedRemote=true}for(const k in remote){if(/^\d+-/.test(k)&&(remote[k].t||"")<RESTART)changedRemote=true;if(/^[1-9]\d*-/.test(k)&&(remote[k].t||"")<RESTART3)changedRemote=true}
-  archiveOld();if(changedLocal){try{LS&&LS.setItem(KEY,JSON.stringify(DB))}catch(e){}}
+  for(const k in DB){const r=remote[k],l=DB[k];if(!r||(l.t||"")>(r.t||""))changedRemote=true}for(const k in remote){if(/^\d+-/.test(k)&&(remote[k].t||"")<RESTART)changedRemote=true;if(/^[1-9]\d*-/.test(k)&&(remote[k].t||"")<restartAt())changedRemote=true}
+  archiveOld();const planMoved=syncPlan();if(changedLocal){try{LS&&LS.setItem(KEY,JSON.stringify(DB))}catch(e){}}
   if(changedRemote||forcePush||!C.gist){forcePush=false;const body=JSON.stringify({description:"Fitness plan progress (private backup)",files:{[FILE]:{content:JSON.stringify(DB)}}});
    if(C.gist)await gh("/gists/"+C.gist,{method:"PATCH",body});else{const g=await gh("/gists",{method:"POST",body:JSON.stringify({...JSON.parse(body),public:false})});C.gist=g.id;saveC()}}
-  C.last=now();saveC();syncMsg="Synced "+new Date().toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"});if(changedLocal)render();
+  C.last=now();saveC();syncMsg="Synced "+new Date().toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"});if(changedLocal||planMoved)render();
  }catch(e){syncMsg=String(e.message).startsWith("401")?"Sync key not accepted. Check it on the Plan tab.":"Couldn't sync just now: saved on this phone"}
  syncing=false;updSync()}
 function updSync(){const s=document.getElementById("sync");if(s){s.textContent=syncMsg||(C.token?"Sync is on":"Saved on this device. Set up sync in Plan to back up and share progress.");s.setAttribute("aria-busy",String(syncing))}const b=document.getElementById("syncnow")||document.getElementById("connect");if(b){b.disabled=syncing;b.textContent=syncing?"Syncing…":b.id==="connect"?"Turn on sync":"Sync now"}}
 addEventListener("online",sync);setInterval(()=>{if(C.token&&document.visibilityState==="visible")sync()},30000);addEventListener("focus",sync);document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")sync()});
 // ---------- dates ----------
-const DAYS=D.days,pad=n=>String(n).padStart(2,"0");
-const start=new Date(D.weeks[0].start+"T12:00:00");
+let DAYS=D.days,start;const pad=n=>String(n).padStart(2,"0");
+const ISO=d=>d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate()),addDays=(iso,n)=>{const d=new Date(iso+"T12:00:00");d.setDate(d.getDate()+n);return ISO(d)};
+const WKD=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"],MON=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+// the calendar follows the start date: the week runs from that weekday, so day 1 is the day the plan was started
+function applyPlanStart(iso){start=new Date(iso+"T12:00:00");const o=start.getDay();D.days=DAYS=[...WKD.slice(o),...WKD.slice(0,o)];
+ D.weeks.forEach((w,i)=>{const a=new Date(start);a.setDate(a.getDate()+i*7);const b=new Date(a);b.setDate(b.getDate()+6);w.start=ISO(a);w.end=ISO(b);w.label=`${a.getDate()} ${MON[a.getMonth()]} to ${b.getDate()} ${MON[b.getMonth()]}`})}
+applyPlanStart(planStart());
+function syncPlan(){const s=planStart();if(s===D.weeks[0].start)return false;applyPlanStart(s);[W,DI]=todayPos();[TW,TD]=todayPos();return true}
 const dateOf=(w,di)=>{const d=new Date(start);d.setDate(d.getDate()+(w-1)*7+di);return d};
 function todayPos(){const t=new Date();t.setHours(12,0,0,0);const diff=Math.round((t-start)/864e5);if(diff<0)return[1,0];if(diff>83)return[12,6];return[Math.floor(diff/7)+1,diff%7]}
-let [W,DI]=todayPos();const [TW,TD]=todayPos();let TAB="Today";
+let [W,DI]=todayPos();let [TW,TD]=todayPos();let TAB="Today";let RST={open:false,ask:false,date:""};
 const defLoc=d=>({Mon:"PureGym",Tue:"Gym Group",Wed:"Gym Group",Thu:"Gym Group"}[d]||"Home");
 const locOf=(w,d)=>{const x=DB[`${w}-${d}-loc`];return(x&&x.v)||defLoc(d)};
 const esc=t=>String(t==null?"":t).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
@@ -145,11 +153,13 @@ function dayStat(w,di){const d=DAYS[di];let t=0,c=0;
 function scheduledDayStat(w,di){const d=DAYS[di];let t=0,c=0;ownItems(w,d).forEach(({e,r})=>{const n=setsN(e,w,r);t+=n;c+=Math.min(n,doneSets(K(w,d,e.id)))});if(insteadDone(w,d))c=t;return[c,t]}
 const dayDone=(w,di)=>{const[c,t]=dayStat(w,di);return c>=t};
 const topOf=r=>{const m=String(r).match(/\d+/g);return m?+m[m.length>1?1:0]:0};
-function lastTime(w,di,e,name){for(let ww=w;ww>=0;ww--)for(let dd=(ww===w?di-1:6);dd>=0;dd--){const d=DAYS[dd];
+function lastTime(w,di,e,name){const one=(ww,dd)=>{const d=DAYS[dd];
   const ids=listFor(ww,d).flatMap(g=>g.items).filter(({e:x,r:rr})=>(x.custom&&x.id===e.id)||(!x.custom&&rr.name===name)).map(({e:x})=>x.id);
   for(const id of ids){const L=get(K(ww,d,id));const s=(L.s||[]).filter(x=>x&&(x.r||x.kg));if(!s.length)continue;
    const R=res(e,locOf(ww,d));
-   return{txt:`Last time (${ww?`week ${ww}, ${d}`:`before the restart, ${d}`}): `+s.map(x=>(x.r||"?")+(x.kg?` @ ${x.kg} kg${R.assist?" assist":""}`:"")).join(", "),s,R,plan:Math.min(e.sets,setsN(e,ww,R))}}}return null}
+   return{txt:`Last time (${ww?`week ${ww}, ${d}`:`before the restart, ${d}`}): `+s.map(x=>(x.r||"?")+(x.kg?` @ ${x.kg} kg${R.assist?" assist":""}`:"")).join(", "),s,R,plan:Math.min(e.sets,setsN(e,ww,R)),t:L.t||""}}return null};
+ for(let ww=w;ww>=1;ww--)for(let dd=(ww===w?di-1:6);dd>=0;dd--){const r=one(ww,dd);if(r)return r}
+ let best=null;for(let dd=6;dd>=0;dd--){const r=one(0,dd);if(r&&(!best||r.t>best.t))best=r}return best}
 const botOf=r=>{const m=String(r).match(/\d+/);return m?+m[0]:0};
 // sanity-check a weight as it's typed, so totals or typos don't skew future targets
 function kgCheck(val,c){const v=num(val);if(!v||c.assist)return{};const max=Math.max(...c.have);
@@ -218,11 +228,11 @@ const MF=[["waist","Waist"],["hips","Hips"],["arm","Arm"]];
 function measCard(w){const k=`m-${w}`,M=get(k);let ch="";
  MF.forEach(([f,lab])=>{let first=null,fw=0;for(let i=1;i<=w;i++){const v=num(get(`m-${i}`)[f]);if(v){first=v;fw=i;break}}const now=num(M[f]);
   if(first!=null&&now&&fw<w){const d=+(now-first).toFixed(2);ch+=`<span>${lab}: ${d>0?"+":""}${d} in since week ${fw}</span>`}});
- return`<div class="cls"><b>📏 Measurements, week ${w}</b><div class="tip">Measure on Monday, or on the first day you can. Use the same tape and measure before eating if possible. Waist: at your belly button. Hips: at the widest point. Arm: the middle of the same relaxed upper arm. This card stays on Today until waist, hips and arm are filled in.</div><div class="sum">
+ return`<div class="cls"><b>📏 Measurements, week ${w}</b><div class="tip">Measure on ${D.daynames[DAYS[0]]}, or on the first day you can. Use the same tape and measure before eating if possible. Waist: at your belly button. Hips: at the widest point. Arm: the middle of the same relaxed upper arm. This card stays on Today until waist, hips and arm are filled in.</div><div class="sum">
  <div><label>Waist (in)</label><input inputmode="decimal" data-o="${k}" data-f="waist" value="${esc(M.waist||"")}"></div><div><label>Hips (in)</label><input inputmode="decimal" data-o="${k}" data-f="hips" value="${esc(M.hips||"")}"></div>
  <div><label>Arm (in)</label><input inputmode="decimal" data-o="${k}" data-f="arm" value="${esc(M.arm||"")}"></div><div><label>Weight (kg, optional)</label><input inputmode="decimal" data-o="${k}" data-f="kg" value="${esc(M.kg||"")}"></div></div>${ch?`<div class="tot">${ch}</div>`:""}</div>`}
 function measTable(){const rows=[];for(let w=1;w<=12;w++){const M=get(`m-${w}`);if(M.waist||M.hips||M.arm||M.kg)rows.push(`<tr><td>${w}</td><td>${esc(M.waist||"")}</td><td>${esc(M.hips||"")}</td><td>${esc(M.arm||"")}</td><td>${esc(M.kg||"")}</td></tr>`)}
- return`<h3>Measurements</h3>`+(rows.length?`<table class="cal"><tr><th>Week</th><th>Waist</th><th>Hips</th><th>Arm</th><th>kg</th></tr>${rows.join("")}</table>`:`<p style="font-size:14px">Add them on Mondays (or in the Week tab). Your changes since week 1 will show here.</p>`)}
+ return`<h3>Measurements</h3>`+(rows.length?`<table class="cal"><tr><th>Week</th><th>Waist</th><th>Hips</th><th>Arm</th><th>kg</th></tr>${rows.join("")}</table>`:`<p style="font-size:14px">Add them on ${D.daynames[DAYS[0]]}s (or in the Week tab). Your changes since week 1 will show here.</p>`)}
 function today(wk,day){const s=D.sess[day];const ck=`${W}-${day}-class`,CL=get(ck),wkey=K(W,day,"walk"),WL=get(wkey),sk=`${W}-${day}-sum`,SM=get(sk);
  let tags=`<span class="tag">Week ${wk.ab}</span>`+(wk.type==="Deload"?`<span class="tag del">Easy week: 2 sets</span>`:"")+(wk.n===1?`<span class="tag del">Finding your weights</span>`:"")+(wk.test&&day==="Tue"?`<span class="tag test">Pull-up test today</span>`:"");
  let h=`<div class="hero"><h2>${esc(s.title)}</h2><div class="tags">${tags}</div><div class="prog"><i id="pbar"></i></div><div class="saved" id="saved"></div></div>`;
@@ -349,8 +359,25 @@ function planView(){const n=Object.keys(DB).length,syncState=C.token?`<div class
  <section class="plan-overview"><div><span>Programme</span><b>12 weeks</b><small>${D.weeks[0].label.split(" to ")[0]} → ${D.weeks[11].label.split(" to ")[1]}</small></div><div><span>Current focus</span><b>${esc(D.weeks[W-1].type)}</b><small>${esc(D.weeks[W-1].focus)}</small></div><div><span>Saved locally</span><b>${n} entries</b><small>on this device</small></div></section>
  <section class="settings-stack"><details class="settings-panel" open><summary><span><i>${icon("cloud")}</i><span><b>Sync & backup</b><small>${C.token?"Connected":"Set up cloud backup"}</small></span></span><span>⌄</span></summary><div class="settings-body">${syncState}<div class="backup-row"><button class="mini-btn" id="exp">${icon("cloud")}Download backup</button><label class="mini-btn">${icon("history")}Restore backup<input type="file" id="imp" accept=".json,application/json" hidden></label><button class="mini-btn" id="csv">${icon("chart")}Export CSV</button></div></div></details>
  <details class="settings-panel"><summary><span><i>${icon("calendar")}</i><span><b>12-week schedule</b><small>Easy weeks, tests and focus</small></span></span><span>⌄</span></summary><div class="settings-body"><table class="cal"><tr><th>Week</th><th>Dates</th><th>Focus</th></tr>${D.weeks.map(w=>`<tr class="${w.n===TW?"cur":""}" data-w="${w.n}"><td>${w.n}${w.type==="Deload"?'<span class="week-marker">Easy</span>':""}${w.test?'<span class="week-marker">Test</span>':""}</td><td>${w.label}</td><td>${esc(w.focus)}</td></tr>`).join("")}</table></div></details>
+ ${restartPanel()}
  <details class="settings-panel"><summary><span><i>${icon("ruler")}</i><span><b>Tracking & equipment</b><small>Measurements, dumbbells and rings</small></span></span><span>⌄</span></summary><div class="settings-body"><div class="setting-block"><div><b>Home dumbbells</b><small>Weights available, in kg</small></div><input aria-label="Home dumbbell weights in kilograms" data-o="cfg-homedb" data-f="v" value="${esc(get("cfg-homedb").v||"2.3, 4, 7")}" placeholder="2.3, 4, 7"></div>${measTable()}<div class="goal-cards"><div><i></i><b>450</b><span>Move kcal</span></div><div><i></i><b>30</b><span>Exercise min</span></div><div><i></i><b>10</b><span>Stand hours</span></div></div><details class="inline-help"><summary>Set up one-tap ring logging</summary><p>Use an iPhone Shortcut to read Active Calories, Exercise Minutes and Steps, then open the app’s watch link. Stand hours can be added manually.</p></details></div></details>
  <details class="settings-panel"><summary><span><i>${icon("trend")}</i><span><b>How progression works</b><small>Strength rules and missed days</small></span></span><span>⌄</span></summary><div class="settings-body"><div class="guidance-grid"><div><span class="eyebrow">Getting stronger</span><ul>${D.progress.map(r=>`<li>${esc(r)}</li>`).join("")}</ul></div><div><span class="eyebrow">Missed a day</span><ul>${D.rules.map(r=>`<li>${esc(r)}</li>`).join("")}</ul></div></div></div></details></section>`}
+
+// ---------- restart the plan whenever you choose ----------
+const longDate=d=>d.toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"short",year:"numeric"}),todayISO=()=>ISO(new Date());
+const startMin=()=>addDays(todayISO(),-6),startMax=()=>addDays(todayISO(),28);
+function restartPreview(iso){const a=new Date(iso+"T12:00:00"),b=new Date(a),c=new Date(a);b.setDate(b.getDate()+6);c.setDate(c.getDate()+83);return`Week 1 runs ${longDate(a)} to ${longDate(b)}. The plan finishes on ${longDate(c)}.`}
+function restartPanel(){const d=RST.date||todayISO(),a=new Date(d+"T12:00:00");
+ return`<details class="settings-panel" id="restart-panel"${RST.open?" open":""}><summary><span><i>${icon("history")}</i><span><b>Restart the plan</b><small>Begin week 1 again, keeping your history</small></span></span><span>⌄</span></summary><div class="settings-body">
+ <p style="font-size:14px">Need a fresh start? Choose the day week 1 begins. Everything you have logged so far becomes your "last time", so your weights and targets carry on, and weeks 1 to 12 start empty. Measurements and settings stay as they are.</p>
+ <div class="tip">The plan currently started on ${longDate(start)}.</div>
+ <label class="field-label" for="rs-date">Week 1 starts on</label><input class="wide-input" type="date" id="rs-date" value="${esc(d)}" min="${startMin()}" max="${startMax()}">
+ <div class="tip" id="rs-prev">${restartPreview(d)}</div>
+ ${RST.ask?`<div class="restart-confirm" role="group" aria-labelledby="rs-q"><b id="rs-q">Restart from ${longDate(a)}?</b><p>Your history is kept as "last time". ${C.token?"Your other devices restart too once they sync.":"Sync is off, so this only restarts this device."} Download a backup first if you want a full copy.</p><div class="button-row"><button class="btn" id="rs-yes">Yes, restart the plan</button><button class="btn alt" id="rs-no">Cancel</button></div></div>`:`<button class="btn alt" id="rs-go">Restart the plan…</button>`}
+ </div></details>`}
+function restartPlan(iso){if(!/^\d{4}-\d{2}-\d{2}$/.test(iso)||iso<startMin()||iso>startMax()){RST.ask=false;RST.open=true;render();alert("Choose a start date from a week ago to four weeks ahead.");return}
+ DB["cfg-restart"]={start:iso,at:now()};MEMO={};archiveOld();applyPlanStart(iso);[W,DI]=todayPos();[TW,TD]=todayPos();TAB="Today";RST={open:false,ask:false,date:""};
+ save("cfg-restart");render();scrollTo(0,0);flash("Plan restarted. Week 1 starts "+fmt(start))}
 
 function go(dx){DI+=dx;if(DI>6){if(W<12){W++;DI=0}else DI=6}if(DI<0){if(W>1){W--;DI=6}else DI=0}render();scrollTo(0,0)}
 function bar(){const b=document.getElementById("pbar");if(!b)return;let[c,t]=dayStat(W,DI);const visible=[...document.querySelectorAll(".workout-section .completion-badge")];if(visible.length){c=0;t=0;visible.forEach(x=>{const p=x.textContent.split("/").map(Number);c+=p[0]||0;t+=p[1]||0})}const pc=t?100*c/t:0;b.style.width=pc+"%";const p=b.closest(".prog");if(p)p.setAttribute("aria-valuenow",String(Math.round(pc)));const dial=document.querySelector(".progress-dial");if(dial){dial.style.setProperty("--progress",pc*3.6+"deg");const n=dial.querySelector("b"),s=dial.querySelector("span");if(n)n.textContent=Math.round(pc)+"%";if(s)s.textContent=c+" of "+t+" sets"}const count=document.querySelector(".section-count");if(count)count.textContent=c+"/"+t+" sets";const ch=document.querySelector(`.chip[data-di="${DI}"]`);if(ch)ch.classList.toggle("done",dayDone(W,DI))}
@@ -359,7 +386,7 @@ function bind(){const $=id=>document.getElementById(id),Q=s=>document.querySelec
  $("prev").onclick=()=>TAB!=="Today"?(W>1&&(W--,render())):go(-1);$("next").onclick=()=>TAB!=="Today"?(W<12&&(W++,render())):go(1);
  Q("[data-di]").forEach(b=>b.onclick=()=>{DI=+b.dataset.di;TAB="Today";render();scrollTo(0,0)});
  Q("[data-loc]").forEach(b=>b.onclick=()=>{put(`${W}-${day}-loc`,{v:b.dataset.loc});render()});
- Q("[data-tab]").forEach(b=>b.onclick=()=>{TAB=b.dataset.tab;render();scrollTo(0,0)});
+ Q("[data-tab]").forEach(b=>b.onclick=()=>{TAB=b.dataset.tab;RST.open=false;RST.ask=false;render();scrollTo(0,0)});
  Q("[data-w]").forEach(b=>b.onclick=()=>{W=+b.dataset.w;TAB="Week";render();scrollTo(0,0)});
  Q("input[data-f][data-k]").forEach(i=>i.oninput=()=>setv(i.dataset.k,+i.dataset.j,i.dataset.f,i.value));
  Q("input[data-chk]").forEach(i=>i.onchange=()=>{const w=document.querySelector(`[data-warn="${i.dataset.k}"]`),m=kgCheck(i.value,JSON.parse(i.dataset.chk));
@@ -386,6 +413,10 @@ function bind(){const $=id=>document.getElementById(id),Q=s=>document.querySelec
  if($("pairlink"))$("pairlink").onclick=()=>{const link=`${location.origin}${location.pathname}#pair=${encodeURIComponent(C.token)}~${encodeURIComponent(C.gist||"")}`;const m=$("pairmsg");
   const done=()=>{m.textContent="Copied. On your phone (with the same Apple ID, Bluetooth and Wi-Fi on), paste it into the sync box in the Plan tab, or into Safari's address bar. Treat it like a password: don't post or send it to anyone."};
   (navigator.clipboard?navigator.clipboard.writeText(link).then(done):Promise.reject()).catch(()=>{m.innerHTML=`Copy this link: <input readonly value="${esc(link)}" style="width:100%" onclick="this.select()">`})};
+ if($("rs-date"))$("rs-date").onchange=e=>{RST.date=e.target.value||"";RST.ask=false;RST.open=true;render()};
+ if($("rs-go"))$("rs-go").onclick=()=>{RST.date=$("rs-date").value||todayISO();RST.ask=true;RST.open=true;render();const q=$("rs-q");if(q)q.scrollIntoView({block:"center"})};
+ if($("rs-no"))$("rs-no").onclick=()=>{RST.ask=false;RST.open=true;render()};
+ if($("rs-yes"))$("rs-yes").onclick=()=>restartPlan(RST.date||todayISO());
  if($("syncnow"))$("syncnow").onclick=()=>sync().then(render);
  if($("unsync"))$("unsync").onclick=()=>{if(confirm("Turn off sync on this device? Your progress stays on the phone and in your GitHub backup.")){C={};saveC();render()}};
  const dl=(name,txt,type)=>{const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([txt],{type}));a.download=name;document.body.appendChild(a);a.click();a.remove()};

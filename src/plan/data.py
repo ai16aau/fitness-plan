@@ -1,7 +1,7 @@
 import json, datetime as dt
-START = dt.date(2026,11,23)
+START = dt.date(2026,11,28)
 FOCUS = {1:"Find your working weights; stop sets with about 3 reps spare",2:"Complete all sets and add reps",3:"Keep adding reps; go heavier where the app says so",
-4:"Add weight where earned; less pull-up assistance if ready",5:"Christmas easy week: 2 sets, shorter sessions",6:"Back to full sets; first unassisted pull-up attempt",
+4:"Add weight where earned; less pull-up assistance if ready",5:"Easy week: 2 sets, shorter sessions",6:"Back to full sets; first unassisted pull-up attempt",
 7:"Add weight where earned; less pull-up assistance if ready",8:"Highest volume week",9:"Strength focus; unassisted pull-up test",
 10:"Easy week: 2 sets, recover before the final push",11:"Controlled personal bests; one or two pull-up attempts",12:"Final week: test 1 to 2 pull-ups, take your final measurements"}
 TESTS = {6,9,11,12}
@@ -70,7 +70,9 @@ PROGRESS=["Start each exercise at a weight that leaves the stated reps in reserv
 "Then add weight (or reduce pull-up assistance) and drop back to the bottom of the range.","Change only one thing at a time: weight, reps or assistance.",
 "Pull-up bands, easiest to hardest: green, purple, black, red, yellow, none. Move down a band after 3 × 8.",
 "Unassisted pull-up test (test weeks only): one attempt after warming up, before assisted sets."]
-DAYS=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"]
+WEEKDAYS=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"]
+# the week runs from the start date's weekday, so day 1 is always the day the plan was started
+DAYS=WEEKDAYS[START.weekday():]+WEEKDAYS[:START.weekday()]
 DAYNAME=dict(Mon="Monday",Tue="Tuesday",Wed="Wednesday",Thu="Thursday",Fri="Friday",Sat="Saturday",Sun="Sunday")
 def session_for(day,ab):
     s=SESS[day]; out=[]

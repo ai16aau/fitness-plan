@@ -20,6 +20,13 @@ These are the source files the live site (`index.html`, `sw.js`, `img/`) is buil
 5. Serve `site/` on port 8790 and run `node tests/regression.js`. Every check must pass before publishing.
 6. Copy `site/` into the repo root and commit.
 
+## Restarting the plan
+
+- **In the app:** Plan tab, "Restart the plan". The user picks the day week 1 begins (from a week ago to four weeks ahead) and confirms. The app stores `cfg-restart` (`start` date and `at` time) in the same synced data as everything else, so other devices restart when they next sync.
+- **What a restart does:** every week 1 to 12 log older than `at` moves to week 0 (`0-*` keys, newest entry wins per key, the entry it replaces is kept as `arch-*`), so "last time" weights and targets carry on. Measurements (`m-*`) and settings (`cfg-homedb`) are left alone.
+- **Calendar:** `applyPlanStart()` in `app.js` builds the day order (the week runs from the start date's weekday), week dates and labels from the start date. Sessions are keyed by weekday name, so a session always stays on its own weekday.
+- **Built-in default:** `START` in `plan/data.py` and `RESTART_BAKED` in `app.js` (currently Sat 28 Nov 2026). Change both together. A later in-app restart always wins over the built-in one.
+
 ## Rules for committing
 
 - Commit as `ai16aau` with the no-reply address `56545748+ai16aau@users.noreply.github.com`.

@@ -46,7 +46,7 @@ for f in ('icon-192.png','icon-512.png'): shutil.copy(f'/home/claude/app/site/{f
 json.dump({"name":"Fitness Plan","short_name":"Fitness","start_url":"./","scope":"./","display":"standalone","background_color":"#f3f1ec","theme_color":"#3f7f80",
  "icons":[{"src":"icon-192.png","sizes":"192x192","type":"image/png"},{"src":"icon-512.png","sizes":"512x512","type":"image/png","purpose":"any maskable"}]},open('site/manifest.json','w'),indent=1)
 files=['./','index.html','manifest.json','icon-192.png','icon-512.png']+[f'img/{i}_{j}.jpg' for i in ids for j in ((0,) if i in CUST else (0,1))]
-open('site/sw.js','w').write(f"""const C='fitness-v38';const F={json.dumps(files)};
+open('site/sw.js','w').write(f"""const C='fitness-v39';const F={json.dumps(files)};
 self.addEventListener('install',e=>{{e.waitUntil(caches.open(C).then(c=>c.addAll(F)));self.skipWaiting()}});
 self.addEventListener('activate',e=>{{e.waitUntil(caches.keys().then(k=>Promise.all(k.filter(x=>x!==C).map(x=>caches.delete(x)))));self.clients.claim()}});
 self.addEventListener('fetch',e=>{{const u=new URL(e.request.url);if(u.origin!==location.origin)return;
